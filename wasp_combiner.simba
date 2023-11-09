@@ -65,7 +65,7 @@ begin
   inherited;
 end;
 
-procedure TCombiner.Init(maxActions: Int32; maxTime: Int64); override;
+procedure TCombiner.Init(maxActions: Uint32; maxTime: Uint64); override;
 var
   Item: TRSBankDepositItem;
 begin
