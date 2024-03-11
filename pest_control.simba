@@ -2,7 +2,7 @@
 {$DEFINE SCRIPT_GUI}
 {$I SRL-T/osr.simba}
 {$I WaspLib/osr.simba}
-{$I WaspLib/osr/handlers/combathandler.simba}
+{$I WaspLib/optional/handlers/combathandler.simba}
 
 begin
   Login.PlayerIndex := 0;
@@ -71,7 +71,7 @@ procedure TAntiban.Setup(); override;
 begin
   Antiban.Skills := [ERSSkill.HITPOINTS, ERSSkill.TOTAL];
   Antiban.MinZoom := 0;
-  Antiban.MaxZoom := 15;
+  Antiban.MaxZoom := 5;
   inherited;
 end;
 
@@ -84,7 +84,7 @@ begin
   inherited;
 
   Self.RSW.Setup([RSRegions.PEST_CONTROL_ISLAND, RSRegions.PEST_CONTROL_OUTPOST]);
-  Self.Center := [5760, 5688];
+  Self.Center := [5760, 5680];
 
   RSMonsters.AnyMonster.UpText := ['Attack'];
   RSMonsters.AnyMonster.Setup(50, 5, [Self.Center]);
@@ -115,10 +115,17 @@ end;
 
 function TPestControl.EnterBoat(): Boolean;
 begin
-  if PCPlank.WalkClick() then
+  if (not InRange(Options.GetZoomLevel, 0, 5)) then
+    Options.SetZoomLevel(SRL.TruncatedGauss(0, 5));
+  wait(100);
+  while not Self.InBoat(rsw.GetMyPos) and not Self.InIsland(rsw.GetMyPos) do
   begin
-    Minimap.WaitMoving();
-    Result := WaitUntil(Self.InBoat(Self.RSW.GetMyPos), 100, 10000);
+    if PCPlank.WalkClick() then
+    begin
+      Minimap.WaitMoving();
+      Result := WaitUntil(Self.InBoat(Self.RSW.GetMyPos), 100, 1000);
+      exit;
+    end;
   end;
 end;
 
@@ -143,7 +150,11 @@ function TPestControl.WalkSpot(): Boolean;
 var
   TPA: TPointArray := PopulateTile(Center, 2);
 begin
-  Result := Self.RSW.WebWalk(TPA, 8, 0.2);
+  while (distance(rsw.GetMyPos, Center) > 10) and (Self.InIsland(rsw.GetMyPos)) do
+  begin
+    Self.RSW.WebWalk(Center);
+  end;
+  Result := true;
 end;
 
 function TPestControl.GetState(): EState;
@@ -155,20 +166,14 @@ begin
 
   if Self.InIsland(me) then
   begin
-    if Self.PlayerLowHP() and Inventory.ContainsAny(FOOD_ARRAY) then
-      Exit(EState.HEAL_PLAYER);
-
-    if me.Y > 5653 then
+    if distance(me, center) <= 20 then
     begin
       if not Minimap.IsPrayerEnabled() and (Minimap.GetPrayerLevel() > 5) then
         Exit(EState.ENABLE_PRAYER);
 
       if not MainScreen.WaitInCombat(1200) then
         Exit(EState.ATTACK);
-
-      Exit(EState.IN_COMBAT);
     end;
-
     Exit(EState.WALK_CENTER);
   end;
 
@@ -184,7 +189,7 @@ end;
 procedure TPestControl.Run(maxActions: UInt32; maxTime: UInt64);
 begin
   Self.Init(maxActions, maxTime);
-
+  mouse.Speed := 45;
   repeat
     Self.State := Self.GetState();
     Self.SetAction(ToStr(Self.State));
@@ -367,7 +372,7 @@ begin
   end;
 
   Self.CreateVersionPanel(tab);
-  Self.CreateAlchemyPanel();
+
   Self.CreateAntibanManager();
   Self.CreateWaspLibSettings();
   Self.CreateAPISettings();
